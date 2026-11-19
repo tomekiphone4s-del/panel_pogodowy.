@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Warszawa — pogoda i zegar</title>
+<style>
+* { box-sizing: border-box; }
+html, body { margin:0; width:100%; min-height:100%; background:#101820; color:#f4f7fb; font-family:Arial,Helvetica,sans-serif; }
+body { padding:24px 34px; }
+.top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+.place { color:#aab8c7; font-size:23px; letter-spacing:2px; text-transform:uppercase; }
+.clock { font-size:clamp(76px,13vw,142px); line-height:1; font-weight:bold; letter-spacing:-5px; margin-top:12px; }
+.date { color:#aab8c7; font-size:25px; margin-top:12px; }
+.current { text-align:right; min-width:260px; }
+.icon { font-size:74px; line-height:1.2; }
+.temp { font-size:76px; font-weight:bold; }
+.desc { color:#c3ced9; font-size:24px; margin-top:4px; }
+.details { color:#91a2b3; font-size:18px; margin-top:12px; }
+.line { height:1px; background:#344452; margin:25px 0 22px; }
+.forecast-title { color:#aab8c7; font-size:18px; letter-spacing:2px; text-transform:uppercase; margin-bottom:16px; }
+.forecast { display:flex; justify-content:space-between; gap:12px; }
+.day { flex:1; text-align:center; background:#1b2935; border-radius:15px; padding:17px 8px; }
+.dayname { color:#b5c2ce; font-size:18px; }
+.dayicon { font-size:35px; margin:12px 0; }
+.hi { font-size:24px; font-weight:bold; }
+.lo { color:#91a2b3; font-size:19px; margin-top:5px; }
+.status { color:#75899a; font-size:13px; text-align:right; margin-top:15px; }
+.error { color:#ffbd8b; font-size:16px; margin-top:12px; }
+@media (max-width:650px) {
+ body { padding:18px; } .clock { font-size:76px; } .current { min-width:130px; }
+ .temp { font-size:48px; } .icon { font-size:48px; } .desc { font-size:18px; }
+ .day { padding:12px 3px; } .dayname { font-size:14px; } .dayicon { font-size:25px; }
+}
+</style>
+</head>
+<body>
+<div class="top">
+  <div>
+    <div class="place">Warszawa · Polska</div>
+    <div class="clock" id="clock">--:--</div>
+    <div class="date" id="date">Ładowanie daty…</div>
+  </div>
+  <div class="current">
+    <div class="icon" id="icon">🌤️</div>
+    <div class="temp" id="temp">--°</div>
+    <div class="desc" id="desc">Ładowanie pogody…</div>
+    <div class="details" id="details">Warszawa</div>
+  </div>
+</div>
+<div class="line"></div>
+<div class="forecast-title">Prognoza na 5 dni</div>
+<div class="forecast" id="forecast">
+  <div class="day">Pobieranie prognozy…</div>
+</div>
+<div class="status" id="status">Dane pogodowe: Open-Meteo · odświeżanie co 30 minut</div>
+<div class="error" id="error"></div>
+<script>
+function tick() {
+ var d=new Date();
+ document.getElementById('clock').innerHTML=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+ var days=['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+ var months=['stycznia','lutego','marca','kwietnia','maja','czerwca','lipca','sierpnia','września','października','listopada','grudnia'];
+ document.getElementById('date').innerHTML=days[d.getDay()]+', '+d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear();
+}
+tick(); setInterval(tick,1000);
+function weather(code) {
+ if(code===0) return ['☀️','Bezchmurnie'];
+ if(code===1) return ['🌤️','Przeważnie pogodnie'];
+ if(code===2) return ['⛅','Częściowe zachmurzenie'];
+ if(code===3) return ['☁️','Pochmurno'];
+ if(code===45||code===48) return ['🌫️','Mgła'];
+ if(code>=51&&code<=57) return ['🌦️','Mżawka'];
+ if(code>=61&&code<=67) return ['🌧️','Deszcz'];
+ if(code>=71&&code<=77) return ['❄️','Śnieg'];
+ if(code>=80&&code<=82) return ['🌧️','Przelotne opady'];
+ if(code>=85&&code<=86) return ['🌨️','Przelotny śnieg'];
+ if(code>=95) return ['⛈️','Burza'];
+ return ['🌡️','Warunki zmienne'];
+}
+function load() {
+ var url='https://api.open-meteo.com/v1/forecast?latitude=52.2297&longitude=21.0122&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=6&timezone=Europe%2FWarsaw';
+ var x=new XMLHttpRequest();
+ x.open('GET',url,true); x.timeout=15000;
+ x.onreadystatechange=function(){
+  if(x.readyState!==4) return;
+  if(x.status===200) {
+   try {
+    var j=JSON.parse(x.responseText), c=j.current, w=weather(c.weather_code);
+    document.getElementById('icon').innerHTML=w[0];
+    document.getElementById('temp').innerHTML=Math.round(c.temperature_2m)+'°C';
+    document.getElementById('desc').innerHTML=w[1];
+    document.getElementById('details').innerHTML='Odczuwalna '+Math.round(c.apparent_temperature)+'° · wilgotność '+c.relative_humidity_2m+'% · wiatr '+Math.round(c.wind_speed_10m)+' km/h';
+    var out='', names=['niedz.','pon.','wt.','śr.','czw.','pt.','sob.'];
+    for(var i=1;i<6;i++){
+      var dt=new Date(j.daily.time[i]+'T12:00:00');
+      var dw=weather(j.daily.weather_code[i]);
+      out+='<div class="day"><div class="dayname">'+names[dt.getDay()]+'</div><div class="dayicon">'+dw[0]+'</div><div class="hi">'+Math.round(j.daily.temperature_2m_max[i])+'°</div><div class="lo">'+Math.round(j.daily.temperature_2m_min[i])+'°</div></div>';
+    }
+    document.getElementById('forecast').innerHTML=out;
+    document.getElementById('error').innerHTML='';
+    document.getElementById('status').innerHTML='Aktualizacja: '+new Date().toLocaleTimeString()+' · Open-Meteo';
+   } catch(e) { document.getElementById('error').innerHTML='Nie udało się odczytać danych pogodowych.'; }
+  } else { document.getElementById('error').innerHTML='Nie udało się pobrać pogody. Sprawdź połączenie z internetem.'; }
+ };
+ x.ontimeout=function(){document.getElementById('error').innerHTML='Przekroczono czas pobierania pogody.';};
+ x.send();
+}
+load(); setInterval(load,1800000);
+</script>
+</body>
+</html>
